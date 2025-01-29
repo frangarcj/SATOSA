@@ -1,3 +1,9 @@
+from sqlalchemy.ext.declarative import declarative_base
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class Storage:
     def __init__(self, config):
         self.db_config = config["DATABASE"]
@@ -7,25 +13,35 @@ class SessionStorage(Storage):
     """
     In-memory storage
     """
+
     def __init__(self, config):
         super().__init__(config)
         self.authn_responses = {}
+        logger.debug("Initialized in-memory session storage")
 
     def store_authn_resp(self, state, internal_resp):
         self.authn_responses[state["SESSION_ID"]] = internal_resp.to_dict()
+        logger.debug(
+            f"Stored authentication response for session {state['SESSION_ID']}")
 
     def get_authn_resp(self, state):
-        return self.authn_responses.get(state["SESSION_ID"])
+        resp = self.authn_responses.get(state["SESSION_ID"])
+        if resp:
+            logger.debug(
+                f"Retrieved authentication response for session {state['SESSION_ID']}")
+        else:
+            logger.debug(
+                f"No authentication response found for session {state['SESSION_ID']}")
+        return resp
 
     def delete_session(self, state):
         if self.authn_responses.get(state["SESSION_ID"]):
             del self.authn_responses[state["SESSION_ID"]]
-
-
-from sqlalchemy.ext.declarative import declarative_base
+            logger.debug(f"Deleted session {state['SESSION_ID']}")
 
 
 Base = declarative_base()
+
 
 class AuthnResponse(Base):
     from sqlalchemy.dialects.postgresql import JSON
@@ -41,7 +57,7 @@ class SessionStoragePDB(Storage):
     """
     PostgreSQL storage
     """
-    
+
     def __init__(self, config):
         super().__init__(config)
 
@@ -69,7 +85,7 @@ class SessionStoragePDB(Storage):
         auth_response = AuthnResponse(
             session_id=state["SESSION_ID"],
             authn_response=(internal_resp.to_dict())
-        )   
+        )
         session.add(auth_response)
         session.commit()
         session.close()
@@ -86,6 +102,7 @@ class SessionStoragePDB(Storage):
 
     def delete_session(self, state):
         session = self.Session()
-        session.query(AuthnResponse).filter(AuthnResponse.session_id == state["SESSION_ID"]).delete()
+        session.query(AuthnResponse).filter(
+            AuthnResponse.session_id == state["SESSION_ID"]).delete()
         session.commit()
         session.close()
