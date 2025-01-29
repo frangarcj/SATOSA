@@ -236,6 +236,9 @@ class SAMLBackend(BackendModule, SAMLBaseModule):
         endpoints = self.sp.config.getattr("endpoints", "sp")
         return_url = endpoints["discovery_response"][0][0]
 
+        separator = '&' if '?' in return_url else '?'
+        return_url = f"{return_url}{separator}dummy=dummy"
+
         disco_url = (
             context.get_decoration(SAMLBackend.KEY_SAML_DISCOVERY_SERVICE_URL)
             or self.discosrv
@@ -572,16 +575,18 @@ class SAMLBackend(BackendModule, SAMLBaseModule):
         """
         if not context.request.get("SAMLResponse"):
             msg = "Missing Response for state"
-            logline = lu.LOG_FMT.format(id=lu.get_session_id(context.state), message=msg)
+            logline = lu.LOG_FMT.format(
+                id=lu.get_session_id(context.state), message=msg)
             logger.debug(logline)
             raise SATOSAUnknownError(context.state, "Missing Response")
 
         try:
             logout_response = self.sp.parse_logout_request_response(
-                    context.request["SAMLResponse"], binding)
+                context.request["SAMLResponse"], binding)
         except Exception as err:
             msg = "Failed to parse logout response for state"
-            logline = lu.LOG_FMT.format(id=lu.get_session_id(context.state), message=msg)
+            logline = lu.LOG_FMT.format(
+                id=lu.get_session_id(context.state), message=msg)
             logger.debug(logline, exc_info=True)
             message = "Logout Failed"
             status = "500 FAILED"
@@ -767,7 +772,7 @@ class SAMLBackend(BackendModule, SAMLBaseModule):
         for endp, binding in sp_endpoints["single_logout_service"]:
             parsed_endp = urlparse(endp)
             url_map.append(("^%s$" % parsed_endp.path[1:],
-                functools.partial(self.logout_response, binding=binding)))
+                            functools.partial(self.logout_response, binding=binding)))
 
         return url_map
 
